@@ -1,7 +1,10 @@
-﻿using Microsoft.AspNetCore.Identity;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 using Test02.Models;
 using Test02.Models.ViewModels;
+using Test02.Services;
 
 namespace Test02.Controllers
 {
@@ -72,7 +75,7 @@ namespace Test02.Controllers
 
             return View(model);
         }
-
+        [Authorize(Policy = "DeletePolicy")]
         // Xóa người dùng
         [HttpPost]
         public async Task<IActionResult> Delete(string id)
@@ -97,5 +100,50 @@ namespace Test02.Controllers
 
             return RedirectToAction("Index");
         }
+
+        [HttpGet]
+        public async Task<IActionResult> ManageUserClaims(string userId)
+        {
+            var user = await _userManager.FindByIdAsync(userId);
+            if (user == null) return NotFound();
+
+            var existingUserClaims = await _userManager.GetClaimsAsync(user);
+
+            var model = new UserClaimsViewModel
+            {
+                UserId = user.Id,
+                Claims = ClaimsStore.GetAllClaims().Select(claim => new UserClaim
+                {
+                    ClaimType = claim.Type,
+                    IsSelected = existingUserClaims.Any(c => c.Type == claim.Type)
+                }).ToList()
+            };
+
+            return View(model);
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> ManageUserClaims(UserClaimsViewModel model)
+        {
+            var user = await _userManager.FindByIdAsync(model.UserId);
+            if (user == null) return NotFound();
+
+            // Xóa Claims hiện tại
+            var existingClaims = await _userManager.GetClaimsAsync(user);
+            foreach (var claim in existingClaims)
+            {
+                await _userManager.RemoveClaimAsync(user, claim);
+            }
+
+            // Thêm Claims được chọn
+            var selectedClaims = model.Claims.Where(c => c.IsSelected).Select(c => new Claim(c.ClaimType, c.ClaimType));
+            foreach (var claim in selectedClaims)
+            {
+                await _userManager.AddClaimAsync(user, claim);
+            }
+
+            return RedirectToAction("Index", new { id = model.UserId });
+        }
+
     }
 }

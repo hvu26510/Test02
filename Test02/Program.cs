@@ -14,6 +14,12 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>()
     .AddEntityFrameworkStores<ApplicationDbContext>()
     .AddDefaultTokenProviders();
 
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("DeletePolicy", policy => policy.RequireClaim("Delete Role"));
+});
+
+
 builder.Services.AddControllersWithViews();
 
 var app = builder.Build();
